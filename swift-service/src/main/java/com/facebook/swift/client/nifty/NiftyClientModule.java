@@ -15,8 +15,8 @@
  */
 package com.facebook.swift.client.nifty;
 
-import com.facebook.swift.client.guice.MethodInvokerFactory;
 import com.facebook.swift.service.ThriftClientConfig;
+import com.facebook.swift.transport.guice.MethodInvokerFactory;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import io.airlift.configuration.ConfigBinder;
