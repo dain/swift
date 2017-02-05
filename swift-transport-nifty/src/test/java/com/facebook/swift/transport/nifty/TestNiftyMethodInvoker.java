@@ -15,12 +15,12 @@
  */
 package com.facebook.swift.transport.nifty;
 
-import com.facebook.nifty.client.NiftyClient;
 import com.facebook.swift.codec.ThriftCodec;
 import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.ConnectionContext;
+import com.facebook.swift.transport.MethodInvoker;
 import com.facebook.swift.transport.MethodMetadata;
 import com.facebook.swift.transport.ParameterMetadata;
 import com.facebook.swift.transport.nifty.scribe.apache.LogEntry;
@@ -200,14 +200,10 @@ public class TestNiftyMethodInvoker
     private int logNiftyInvocationHandler(HostAndPort address, List<com.facebook.swift.transport.nifty.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
     {
         AddressSelector addressSelector = context -> ImmutableList.of(address);
-        NiftyClientConfig config = new NiftyClientConfig();
-        try (
-                NiftyClient niftyClient = new NiftyClient();
-                NiftyConnectionPool pool = new NiftyConnectionPool(
-                        new NiftyConnectionFactory(niftyClient, new FramedNiftyClientConnectorFactory(), addressSelector, config),
-                        config)
-        ) {
-            NiftyMethodInvoker niftyMethodInvoker = new NiftyMethodInvoker(pool, addressSelector);
+        NiftyClientConfig config = new NiftyClientConfig()
+                .setPoolEnabled(true);
+        try (NiftyMethodInvokerFactory<Void> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
+            MethodInvoker methodInvoker = methodInvokerFactory.createMethodInvoker(addressSelector, null);
 
             ParameterMetadata parameter = new ParameterMetadata(
                     (short) 1,
@@ -220,7 +216,7 @@ public class TestNiftyMethodInvoker
                     (ThriftCodec<Object>) (Object) codecManager.getCodec(com.facebook.swift.transport.nifty.scribe.swift.ResultCode.class),
                     ImmutableMap.of(), false);
 
-            ListenableFuture<Object> future = niftyMethodInvoker.invoke(methodMetadata, handlers, Optional.empty(), ImmutableMap.of(), ImmutableList.of(entries));
+            ListenableFuture<Object> future = methodInvoker.invoke(methodMetadata, handlers, Optional.empty(), ImmutableMap.of(), ImmutableList.of(entries));
             assertEquals(future.get(), SWIFT_OK);
 
             return 1;

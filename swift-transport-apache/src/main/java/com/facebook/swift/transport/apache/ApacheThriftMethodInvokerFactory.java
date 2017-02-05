@@ -17,9 +17,7 @@ package com.facebook.swift.transport.apache;
 
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.MethodInvoker;
-import com.facebook.swift.transport.guice.MethodInvokerFactory;
-import com.google.inject.Injector;
-import com.google.inject.Key;
+import com.facebook.swift.transport.MethodInvokerFactory;
 import org.apache.thrift.async.TAsyncClientManager;
 
 import javax.annotation.PreDestroy;
@@ -27,18 +25,20 @@ import javax.inject.Inject;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
+import java.util.function.Function;
 
-public class ApacheThriftMethodInvokerFactory
-        implements MethodInvokerFactory, Closeable
+import static java.util.Objects.requireNonNull;
+
+public class ApacheThriftMethodInvokerFactory<I>
+        implements MethodInvokerFactory<I>, Closeable
 {
-    private final Injector injector;
+    private final Function<I, ApacheThriftClientConfig> clientConfigurationProvider;
     private final TAsyncClientManager asyncClientManager;
 
     @Inject
-    public ApacheThriftMethodInvokerFactory(Injector injector)
+    public ApacheThriftMethodInvokerFactory(Function<I, ApacheThriftClientConfig> clientConfigurationProvider)
     {
-        this.injector = injector;
+        this.clientConfigurationProvider = requireNonNull(clientConfigurationProvider, "clientConfigurationProvider is null");
         try {
             this.asyncClientManager = new TAsyncClientManager();
         }
@@ -48,9 +48,9 @@ public class ApacheThriftMethodInvokerFactory
     }
 
     @Override
-    public MethodInvoker createMethodInvoker(AddressSelector addressSelector, Annotation qualifier)
+    public MethodInvoker createMethodInvoker(AddressSelector addressSelector, I clientIdentity)
     {
-        ApacheThriftClientConfig config = injector.getInstance(Key.get(ApacheThriftClientConfig.class, qualifier));
+        ApacheThriftClientConfig config = clientConfigurationProvider.apply(clientIdentity);
         return new ApacheThriftMethodInvoker(asyncClientManager, addressSelector, config);
     }
 

@@ -18,36 +18,33 @@ package com.facebook.swift.transport.nifty;
 import com.facebook.nifty.client.NiftyClient;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.MethodInvoker;
-import com.facebook.swift.transport.guice.MethodInvokerFactory;
-import com.google.inject.Injector;
-import com.google.inject.Key;
+import com.facebook.swift.transport.MethodInvokerFactory;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.Closeable;
-import java.io.IOException;
-import java.lang.annotation.Annotation;
+import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 
-public class NiftyMethodInvokerFactory
-        implements MethodInvokerFactory, Closeable
+public class NiftyMethodInvokerFactory<I>
+        implements MethodInvokerFactory<I>, Closeable
 {
-    private final Injector injector;
+    private final Function<I, NiftyClientConfig> clientConfigurationProvider;
     private final NiftyClient niftyClient;
 
     @Inject
-    public NiftyMethodInvokerFactory(Injector injector)
+    public NiftyMethodInvokerFactory(Function<I, NiftyClientConfig> clientConfigurationProvider)
     {
-        this.injector = requireNonNull(injector, "injector is null");
+        this.clientConfigurationProvider = requireNonNull(clientConfigurationProvider, "clientConfigurationProvider is null");
         this.niftyClient = new NiftyClient();
     }
 
     @Override
-    public MethodInvoker createMethodInvoker(AddressSelector addressSelector, Annotation qualifier)
+    public MethodInvoker createMethodInvoker(AddressSelector addressSelector, I clientIdentity)
     {
-        NiftyClientConfig niftyClientConfig = injector.getInstance(Key.get(NiftyClientConfig.class, qualifier));
+        NiftyClientConfig niftyClientConfig = clientConfigurationProvider.apply(clientIdentity);
 
         NiftyConnectionManager connectionManager = new NiftyConnectionFactory(niftyClient, new FramedNiftyClientConnectorFactory(), addressSelector, niftyClientConfig);
         if (niftyClientConfig.isPoolEnabled()) {
@@ -59,7 +56,6 @@ public class NiftyMethodInvokerFactory
     @PreDestroy
     @Override
     public void close()
-            throws IOException
     {
         niftyClient.close();
     }

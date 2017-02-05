@@ -15,7 +15,6 @@
  */
 package com.facebook.swift.client;
 
-import com.facebook.nifty.client.NiftyClient;
 import com.facebook.swift.client.guice.DefaultClient;
 import com.facebook.swift.client.scribe.apache.LogEntry;
 import com.facebook.swift.client.scribe.apache.ResultCode;
@@ -30,12 +29,9 @@ import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.ConnectionContext;
 import com.facebook.swift.transport.apache.ApacheThriftClientModule;
-import com.facebook.swift.transport.nifty.FramedNiftyClientConnectorFactory;
 import com.facebook.swift.transport.nifty.NiftyClientConfig;
 import com.facebook.swift.transport.nifty.NiftyClientModule;
-import com.facebook.swift.transport.nifty.NiftyConnectionFactory;
-import com.facebook.swift.transport.nifty.NiftyConnectionPool;
-import com.facebook.swift.transport.nifty.NiftyMethodInvoker;
+import com.facebook.swift.transport.nifty.NiftyMethodInvokerFactory;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.HostAndPort;
@@ -225,18 +221,12 @@ public class TestNiftyMethodInvoker
     private int logSwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
     {
         AddressSelector addressSelector = context -> ImmutableList.of(address);
-        NiftyClientConfig config = new NiftyClientConfig();
-        try (
-                NiftyClient niftyClient = new NiftyClient();
-                NiftyConnectionPool pool = new NiftyConnectionPool(
-                        new NiftyConnectionFactory(niftyClient, new FramedNiftyClientConnectorFactory(), addressSelector, config),
-                        config)
-        ) {
-            NiftyMethodInvoker invoker = new NiftyMethodInvoker(pool, addressSelector);
+        NiftyClientConfig config = new NiftyClientConfig()
+                .setPoolEnabled(true);
+        try (NiftyMethodInvokerFactory<Void> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
+            SwiftClientFactory<?> proxyFactory = new SwiftClientFactory<>(codecManager, methodInvokerFactory);
 
-            SwiftClientFactory proxyFactory = new SwiftClientFactory(codecManager);
-
-            Scribe scribe = proxyFactory.createSwiftClient(invoker, Scribe.class, handlers).get();
+            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, null, handlers, addressSelector).get();
 
             assertEquals(scribe.log(entries), SWIFT_OK);
         }
@@ -249,18 +239,12 @@ public class TestNiftyMethodInvoker
     private int logSwiftClientAsync(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
     {
         AddressSelector addressSelector = context -> ImmutableList.of(address);
-        NiftyClientConfig config = new NiftyClientConfig();
-        try (
-                NiftyClient niftyClient = new NiftyClient();
-                NiftyConnectionPool pool = new NiftyConnectionPool(
-                        new NiftyConnectionFactory(niftyClient, new FramedNiftyClientConnectorFactory(), addressSelector, config),
-                        config)
-        ) {
-            NiftyMethodInvoker invoker = new NiftyMethodInvoker(pool, addressSelector);
+        NiftyClientConfig config = new NiftyClientConfig()
+                .setPoolEnabled(true);
+        try (NiftyMethodInvokerFactory<Void> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
+            SwiftClientFactory<?> proxyFactory = new SwiftClientFactory<>(codecManager, methodInvokerFactory);
 
-            SwiftClientFactory proxyFactory = new SwiftClientFactory(codecManager);
-
-            AsyncScribe scribe = proxyFactory.createSwiftClient(invoker, AsyncScribe.class, handlers).get();
+            AsyncScribe scribe = proxyFactory.createSwiftClient(AsyncScribe.class, null, handlers, addressSelector).get();
 
             assertEquals(scribe.log(entries).get(), SWIFT_OK);
         }

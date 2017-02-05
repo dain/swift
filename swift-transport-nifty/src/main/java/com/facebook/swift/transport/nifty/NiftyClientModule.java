@@ -15,14 +15,19 @@
  */
 package com.facebook.swift.transport.nifty;
 
+import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.SwiftClientConfig;
-import com.facebook.swift.transport.guice.MethodInvokerFactory;
 import com.google.inject.Binder;
+import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
 import io.airlift.configuration.ConfigBinder;
 import io.airlift.configuration.ConfigurationBinding;
 
-import static com.google.inject.Scopes.SINGLETON;
+import java.lang.annotation.Annotation;
+
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public class NiftyClientModule
@@ -31,8 +36,6 @@ public class NiftyClientModule
     @Override
     public void configure(Binder binder)
     {
-        binder.bind(MethodInvokerFactory.class).to(NiftyMethodInvokerFactory.class).in(SINGLETON);
-
         configBinder(binder).bindConfigurationBindingListener(this::bindNiftyClientConfig);
     }
 
@@ -41,5 +44,12 @@ public class NiftyClientModule
         if (binding.getConfigClass().equals(SwiftClientConfig.class)) {
             configBinder.bindConfig(NiftyClientConfig.class, binding.getKey().getAnnotation(), binding.getPrefix().orElse(null));
         }
+    }
+
+    @Provides
+    @Singleton
+    private MethodInvokerFactory<Annotation> getMethodInvokerFactory(Injector injector)
+    {
+        return new NiftyMethodInvokerFactory<>(annotation -> injector.getInstance(Key.get(NiftyClientConfig.class, annotation)));
     }
 }

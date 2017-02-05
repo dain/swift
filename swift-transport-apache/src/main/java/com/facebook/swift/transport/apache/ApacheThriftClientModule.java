@@ -15,14 +15,19 @@
  */
 package com.facebook.swift.transport.apache;
 
+import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.SwiftClientConfig;
-import com.facebook.swift.transport.guice.MethodInvokerFactory;
 import com.google.inject.Binder;
+import com.google.inject.Injector;
+import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
 import io.airlift.configuration.ConfigBinder;
 import io.airlift.configuration.ConfigurationBinding;
 
-import static com.google.inject.Scopes.SINGLETON;
+import java.lang.annotation.Annotation;
+
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public class ApacheThriftClientModule
@@ -31,15 +36,22 @@ public class ApacheThriftClientModule
     @Override
     public void configure(Binder binder)
     {
-        binder.bind(MethodInvokerFactory.class).to(ApacheThriftMethodInvokerFactory.class).in(SINGLETON);
-
-        configBinder(binder).bindConfigurationBindingListener(this::bindNiftyClientConfig);
+        configBinder(binder).bindConfigurationBindingListener(this::bindApacheThriftClientConfig);
     }
 
-    private void bindNiftyClientConfig(ConfigurationBinding<?> binding, ConfigBinder configBinder)
+    private void bindApacheThriftClientConfig(ConfigurationBinding<?> binding, ConfigBinder configBinder)
     {
         if (binding.getConfigClass().equals(SwiftClientConfig.class)) {
             configBinder.bindConfig(ApacheThriftClientConfig.class, binding.getKey().getAnnotation(), binding.getPrefix().orElse(null));
         }
     }
+
+
+    @Provides
+    @Singleton
+    private MethodInvokerFactory<Annotation> getMethodInvokerFactory(Injector injector)
+    {
+        return new ApacheThriftMethodInvokerFactory<>(annotation -> injector.getInstance(Key.get(ApacheThriftClientConfig.class, annotation)));
+    }
+
 }

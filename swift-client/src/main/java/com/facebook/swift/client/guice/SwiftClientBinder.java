@@ -17,18 +17,21 @@ package com.facebook.swift.client.guice;
 
 import com.facebook.swift.client.SwiftClient;
 import com.facebook.swift.client.SwiftClientFactory;
+import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
-import com.facebook.swift.transport.MethodInvoker;
+import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.SwiftClientConfig;
-import com.facebook.swift.transport.guice.MethodInvokerFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.TypeParameter;
 import com.google.common.reflect.TypeToken;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.Module;
+import com.google.inject.Provides;
 import com.google.inject.Scopes;
+import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 import org.weakref.jmx.ObjectNameBuilder;
 
@@ -60,6 +63,7 @@ public class SwiftClientBinder
     private SwiftClientBinder(Binder binder)
     {
         this.binder = requireNonNull(binder, "binder is null").skipSources(this.getClass());
+        binder.install(new SwiftClientBinderModule());
     }
 
     public <T> SwiftClientBindingBuilder bindSwiftClient(Class<T> clientInterface)
@@ -85,8 +89,6 @@ public class SwiftClientBinder
             String configPrefix,
             Class<? extends Annotation> annotation)
     {
-        binder.bind(SwiftClientFactory.class).in(Scopes.SINGLETON);
-
         Annotation clientAnnotation = getSwiftClientAnnotation(clientInterface, annotation);
 
         configBinder(binder).bindConfig(SwiftClientConfig.class, clientAnnotation, configPrefix);
@@ -165,8 +167,7 @@ public class SwiftClientBinder
         @Override
         protected SwiftClient<T> get(Injector injector, Class<T> clientInterface, Class<? extends Annotation> annotation)
         {
-            MethodInvokerFactory methodInvokerFactory = injector.getInstance(MethodInvokerFactory.class);
-            SwiftClientFactory proxyFactory = injector.getInstance(SwiftClientFactory.class);
+            SwiftClientFactory<Annotation> proxyFactory = injector.getInstance(Key.get(new TypeLiteral<SwiftClientFactory<Annotation>>() {}));
 
             Annotation clientAnnotation = getSwiftClientAnnotation(clientInterface, annotation);
 
@@ -174,8 +175,36 @@ public class SwiftClientBinder
             List<ClientEventHandler<?>> eventHandlers = ImmutableList.copyOf(injector.getInstance(
                     Key.get(new TypeLiteral<Set<ClientEventHandler<?>>>() {}, clientAnnotation)));
 
-            MethodInvoker invoker = methodInvokerFactory.createMethodInvoker(addressSelector, clientAnnotation);
-            return proxyFactory.createSwiftClient(invoker, clientInterface, eventHandlers);
+            return proxyFactory.createSwiftClient(clientInterface, clientAnnotation, eventHandlers, addressSelector);
+        }
+    }
+
+    private static class SwiftClientBinderModule
+            implements Module
+    {
+        @Override
+        public void configure(Binder binder) {}
+
+        @Provides
+        @Singleton
+        private SwiftClientFactory<Annotation> getSwiftClientFactory(ThriftCodecManager codecManager, MethodInvokerFactory<Annotation> methodInvokerFactory)
+        {
+            return new SwiftClientFactory<>(codecManager, methodInvokerFactory);
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            return !(o == null || getClass() != o.getClass());
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return 42;
         }
     }
 }

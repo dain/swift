@@ -15,9 +15,11 @@
  */
 package com.facebook.swift.transport.nifty;
 
+import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.SwiftClientConfig;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.TypeLiteral;
 import io.airlift.bootstrap.Bootstrap;
 import org.testng.annotations.Test;
 
@@ -46,6 +48,7 @@ public class TestNiftyClientModule
                 .strictConfig()
                 .initialize();
 
+        assertNotNull(injector.getInstance(Key.get(new TypeLiteral<MethodInvokerFactory<Annotation>>(){})));
         assertNotNull(injector.getInstance(Key.get(SwiftClientConfig.class, clientAnnotation)));
         assertNotNull(injector.getInstance(Key.get(NiftyClientConfig.class, clientAnnotation)));
     }

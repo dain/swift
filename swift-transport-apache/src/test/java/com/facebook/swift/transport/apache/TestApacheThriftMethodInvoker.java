@@ -20,6 +20,7 @@ import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.ConnectionContext;
+import com.facebook.swift.transport.MethodInvoker;
 import com.facebook.swift.transport.MethodMetadata;
 import com.facebook.swift.transport.ParameterMetadata;
 import com.facebook.swift.transport.apache.scribe.apache.LogEntry;
@@ -202,10 +203,8 @@ public class TestApacheThriftMethodInvoker
     {
         AddressSelector addressSelector = context -> ImmutableList.of(address);
         ApacheThriftClientConfig config = new ApacheThriftClientConfig();
-        TAsyncClientManager asyncClientManager = null;
-        try {
-            asyncClientManager = new TAsyncClientManager();
-            ApacheThriftMethodInvoker methodInvoker = new ApacheThriftMethodInvoker(asyncClientManager, addressSelector, config);
+        try (ApacheThriftMethodInvokerFactory<Void> methodInvokerFactory = new ApacheThriftMethodInvokerFactory<>(clientIdentity -> config)) {
+            MethodInvoker methodInvoker = methodInvokerFactory.createMethodInvoker(addressSelector, null);
 
             ParameterMetadata parameter = new ParameterMetadata(
                     (short) 1,
@@ -225,11 +224,6 @@ public class TestApacheThriftMethodInvoker
         }
         catch (Exception e) {
             throw Throwables.propagate(e);
-        }
-        finally {
-            if (asyncClientManager != null) {
-                asyncClientManager.stop();
-            }
         }
     }
 

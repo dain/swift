@@ -18,13 +18,13 @@ package com.facebook.swift.client;
 import com.facebook.swift.codec.ThriftCodec;
 import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.codec.metadata.ThriftType;
+import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.MethodInvoker;
+import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.MethodMetadata;
 import com.facebook.swift.transport.ParameterMetadata;
 import com.google.common.collect.ImmutableMap;
-
-import javax.inject.Inject;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -35,19 +35,22 @@ import static com.google.common.reflect.Reflection.newProxy;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-public class SwiftClientFactory
+public class SwiftClientFactory<I>
 {
     private final ThriftCodecManager codecManager;
+    private final MethodInvokerFactory<I> methodInvokerFactory;
 
-    @Inject
-    public SwiftClientFactory(ThriftCodecManager codecManager)
+    public SwiftClientFactory(ThriftCodecManager codecManager, MethodInvokerFactory<I> methodInvokerFactory)
     {
         this.codecManager = requireNonNull(codecManager, "codecManager is null");
+        this.methodInvokerFactory = requireNonNull(methodInvokerFactory, "methodInvokerFactory is null");
     }
 
-    public <T> SwiftClient<T> createSwiftClient(MethodInvoker invoker, Class<T> clientInterface, List<ClientEventHandler<?>> eventHandlers)
+    public <T> SwiftClient<T> createSwiftClient(Class<T> clientInterface, I clientIdentity, List<ClientEventHandler<?>> eventHandlers, AddressSelector addressSelector)
     {
         ThriftServiceMetadata serviceMetadata = new ThriftServiceMetadata(clientInterface, codecManager.getCatalog());
+
+        MethodInvoker invoker = methodInvokerFactory.createMethodInvoker(addressSelector, clientIdentity);
 
         ImmutableMap.Builder<Method, SwiftMethodHandler> builder = ImmutableMap.builder();
         for (ThriftMethodMetadata method : serviceMetadata.getMethods().values()) {

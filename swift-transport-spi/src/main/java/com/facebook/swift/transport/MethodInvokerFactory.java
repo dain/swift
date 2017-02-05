@@ -13,14 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package com.facebook.swift.transport.guice;
+package com.facebook.swift.transport;
 
-import com.facebook.swift.transport.AddressSelector;
-import com.facebook.swift.transport.MethodInvoker;
-
-import java.lang.annotation.Annotation;
-
-public interface MethodInvokerFactory
+public interface MethodInvokerFactory<I>
 {
-    MethodInvoker createMethodInvoker(AddressSelector addressSelector, Annotation qualifier);
+    MethodInvoker createMethodInvoker(AddressSelector addressSelector, I clientIdentity);
 }
