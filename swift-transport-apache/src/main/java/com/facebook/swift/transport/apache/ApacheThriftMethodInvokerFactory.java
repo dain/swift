@@ -35,6 +35,12 @@ public class ApacheThriftMethodInvokerFactory<I>
     private final Function<I, ApacheThriftClientConfig> clientConfigurationProvider;
     private final TAsyncClientManager asyncClientManager;
 
+    public static ApacheThriftMethodInvokerFactory<?> createStaticApacheThriftMethodInvokerFactory(ApacheThriftClientConfig clientConfig)
+    {
+        requireNonNull(clientConfig, "clientConfig is null");
+        return new ApacheThriftMethodInvokerFactory<>(clientIdentity -> clientConfig);
+    }
+
     @Inject
     public ApacheThriftMethodInvokerFactory(Function<I, ApacheThriftClientConfig> clientConfigurationProvider)
     {

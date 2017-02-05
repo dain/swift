@@ -34,6 +34,13 @@ public class NiftyMethodInvokerFactory<I>
     private final Function<I, NiftyClientConfig> clientConfigurationProvider;
     private final NiftyClient niftyClient;
 
+    public static NiftyMethodInvokerFactory<?> createStaticNiftyMethodInvokerFactory(NiftyClientConfig clientConfig)
+    {
+        requireNonNull(clientConfig, "clientConfig is null");
+        return new NiftyMethodInvokerFactory<>(clientIdentity -> clientConfig);
+    }
+
+
     @Inject
     public NiftyMethodInvokerFactory(Function<I, NiftyClientConfig> clientConfigurationProvider)
     {

@@ -28,7 +28,9 @@ import com.facebook.swift.codec.guice.ThriftCodecModule;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.ConnectionContext;
+import com.facebook.swift.transport.apache.ApacheThriftClientConfig;
 import com.facebook.swift.transport.apache.ApacheThriftClientModule;
+import com.facebook.swift.transport.apache.ApacheThriftMethodInvokerFactory;
 import com.facebook.swift.transport.nifty.NiftyClientConfig;
 import com.facebook.swift.transport.nifty.NiftyClientModule;
 import com.facebook.swift.transport.nifty.NiftyMethodInvokerFactory;
@@ -72,6 +74,8 @@ import java.util.stream.Collectors;
 
 import static com.facebook.swift.client.guice.SwiftClientAnnotationFactory.getSwiftClientAnnotation;
 import static com.facebook.swift.client.guice.SwiftClientBinder.swiftClientBinder;
+import static com.facebook.swift.transport.apache.ApacheThriftMethodInvokerFactory.createStaticApacheThriftMethodInvokerFactory;
+import static com.facebook.swift.transport.nifty.NiftyMethodInvokerFactory.createStaticNiftyMethodInvokerFactory;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.annotation.ElementType.FIELD;
@@ -115,7 +119,10 @@ public class TestNiftyMethodInvoker
         int invocationCount = testProcessor(processor, ImmutableList.of(
                 address -> logThrift(address, MESSAGES),
                 address -> logThriftAsync(address, MESSAGES),
-                address -> logSwiftClient(address, SWIFT_MESSAGES, ImmutableList.of()),
+                address -> logNiftySwiftClient(address, SWIFT_MESSAGES, ImmutableList.of()),
+                address -> logNiftyStaticSwiftClient(address, SWIFT_MESSAGES, ImmutableList.of()),
+                address -> logApacheThriftSwiftClient(address, SWIFT_MESSAGES, ImmutableList.of()),
+                address -> logApacheThriftStaticSwiftClient(address, SWIFT_MESSAGES, ImmutableList.of()),
                 address -> logSwiftClientAsync(address, SWIFT_MESSAGES, ImmutableList.of()),
                 address -> logThriftClientBinder(address, SWIFT_MESSAGES),
                 address -> logNiftyClientBinder(address, SWIFT_MESSAGES)));
@@ -218,15 +225,69 @@ public class TestNiftyMethodInvoker
         return 1;
     }
 
-    private int logSwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
+    private int logApacheThriftSwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
+    {
+        AddressSelector addressSelector = context -> ImmutableList.of(address);
+        ApacheThriftClientConfig config = new ApacheThriftClientConfig();
+        try (ApacheThriftMethodInvokerFactory<String> methodInvokerFactory = new ApacheThriftMethodInvokerFactory<>(clientIdentity -> config)) {
+            SwiftClientFactoryManager<String> clientFactoryManager = new SwiftClientFactoryManager<>(codecManager, methodInvokerFactory);
+            SwiftClientFactory proxyFactory = clientFactoryManager.createSwiftClientFactory("clientIdentity", addressSelector);
+
+            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, handlers).get();
+
+            assertEquals(scribe.log(entries), SWIFT_OK);
+        }
+        catch (Exception e) {
+            throw Throwables.propagate(e);
+        }
+        return 1;
+    }
+
+    private int logApacheThriftStaticSwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
+    {
+        AddressSelector addressSelector = context -> ImmutableList.of(address);
+        ApacheThriftClientConfig config = new ApacheThriftClientConfig();
+        try (ApacheThriftMethodInvokerFactory<?> methodInvokerFactory = createStaticApacheThriftMethodInvokerFactory(config)) {
+            SwiftClientFactory proxyFactory = new SwiftClientFactory(codecManager, methodInvokerFactory, addressSelector);
+
+            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, handlers).get();
+
+            assertEquals(scribe.log(entries), SWIFT_OK);
+        }
+        catch (Exception e) {
+            throw Throwables.propagate(e);
+        }
+        return 1;
+    }
+
+    private int logNiftySwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
     {
         AddressSelector addressSelector = context -> ImmutableList.of(address);
         NiftyClientConfig config = new NiftyClientConfig()
                 .setPoolEnabled(true);
-        try (NiftyMethodInvokerFactory<Void> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
-            SwiftClientFactory<?> proxyFactory = new SwiftClientFactory<>(codecManager, methodInvokerFactory);
+        try (NiftyMethodInvokerFactory<String> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
+            SwiftClientFactoryManager<String> clientFactoryManager = new SwiftClientFactoryManager<>(codecManager, methodInvokerFactory);
+            SwiftClientFactory proxyFactory = clientFactoryManager.createSwiftClientFactory("clientIdentity", addressSelector);
 
-            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, null, handlers, addressSelector).get();
+            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, handlers).get();
+
+            assertEquals(scribe.log(entries), SWIFT_OK);
+        }
+        catch (Exception e) {
+            throw Throwables.propagate(e);
+        }
+        return 1;
+    }
+
+    private int logNiftyStaticSwiftClient(HostAndPort address, List<com.facebook.swift.client.scribe.swift.LogEntry> entries, List<ClientEventHandler<?>> handlers)
+    {
+        AddressSelector addressSelector = context -> ImmutableList.of(address);
+        NiftyClientConfig config = new NiftyClientConfig()
+                .setPoolEnabled(true);
+        try (NiftyMethodInvokerFactory<?> methodInvokerFactory = createStaticNiftyMethodInvokerFactory(config)) {
+            SwiftClientFactory proxyFactory = new SwiftClientFactory(codecManager, methodInvokerFactory, addressSelector);
+
+            Scribe scribe = proxyFactory.createSwiftClient(Scribe.class, handlers).get();
 
             assertEquals(scribe.log(entries), SWIFT_OK);
         }
@@ -241,10 +302,11 @@ public class TestNiftyMethodInvoker
         AddressSelector addressSelector = context -> ImmutableList.of(address);
         NiftyClientConfig config = new NiftyClientConfig()
                 .setPoolEnabled(true);
-        try (NiftyMethodInvokerFactory<Void> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
-            SwiftClientFactory<?> proxyFactory = new SwiftClientFactory<>(codecManager, methodInvokerFactory);
+        try (NiftyMethodInvokerFactory<String> methodInvokerFactory = new NiftyMethodInvokerFactory<>(clientIdentity -> config)) {
+            SwiftClientFactoryManager<String> proxyFactoryManager = new SwiftClientFactoryManager<>(codecManager, methodInvokerFactory);
+            SwiftClientFactory proxyFactory = proxyFactoryManager.createSwiftClientFactory("myFactory", addressSelector);
 
-            AsyncScribe scribe = proxyFactory.createSwiftClient(AsyncScribe.class, null, handlers, addressSelector).get();
+            AsyncScribe scribe = proxyFactory.createSwiftClient(AsyncScribe.class, handlers).get();
 
             assertEquals(scribe.log(entries).get(), SWIFT_OK);
         }
@@ -354,7 +416,7 @@ public class TestNiftyMethodInvoker
         List<ClientEventHandler<?>> handlers = ImmutableList.of(eventHandler, secondHandler);
 
         int invocationCount = testProcessor(processor, ImmutableList.of(
-                address -> logSwiftClient(address, SWIFT_MESSAGES, handlers),
+                address -> logNiftySwiftClient(address, SWIFT_MESSAGES, handlers),
                 address -> logSwiftClientAsync(address, SWIFT_MESSAGES, handlers)));
 
         assertEquals(scribeService.getMessages(), newArrayList(concat(nCopies(invocationCount, MESSAGES))));

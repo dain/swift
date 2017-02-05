@@ -18,51 +18,35 @@ package com.facebook.swift.client;
 import com.facebook.swift.codec.ThriftCodec;
 import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.codec.metadata.ThriftType;
-import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
 import com.facebook.swift.transport.MethodInvoker;
-import com.facebook.swift.transport.MethodInvokerFactory;
 import com.facebook.swift.transport.MethodMetadata;
 import com.facebook.swift.transport.ParameterMetadata;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
 import static com.google.common.collect.Maps.transformEntries;
 import static com.google.common.reflect.Reflection.newProxy;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-public class SwiftClientFactory
+public class SwiftClientFactoryOld
 {
     private final ThriftCodecManager codecManager;
-    private final Supplier<MethodInvoker> methodInvokerSupplier;
+    private final MethodInvoker invoker;
 
-    public SwiftClientFactory(ThriftCodecManager codecManager, Supplier<MethodInvoker> methodInvokerSupplier)
+    public SwiftClientFactoryOld(ThriftCodecManager codecManager, MethodInvoker invoker)
     {
         this.codecManager = requireNonNull(codecManager, "codecManager is null");
-        this.methodInvokerSupplier = requireNonNull(methodInvokerSupplier, "methodInvokerSupplier is null");
-    }
-
-    public SwiftClientFactory(ThriftCodecManager codecManager, MethodInvokerFactory<?> invokerFactory, AddressSelector addressSelector)
-    {
-        this(codecManager, () -> invokerFactory.createMethodInvoker(addressSelector, null));
-    }
-
-    public <T> SwiftClient<T> createSwiftClient(Class<T> clientInterface)
-    {
-        return createSwiftClient(clientInterface, ImmutableList.of());
+        this.invoker = requireNonNull(invoker, "invoker is null");
     }
 
     public <T> SwiftClient<T> createSwiftClient(Class<T> clientInterface, List<ClientEventHandler<?>> eventHandlers)
     {
         ThriftServiceMetadata serviceMetadata = new ThriftServiceMetadata(clientInterface, codecManager.getCatalog());
-
-        MethodInvoker invoker = methodInvokerSupplier.get();
 
         ImmutableMap.Builder<Method, SwiftMethodHandler> builder = ImmutableMap.builder();
         for (ThriftMethodMetadata method : serviceMetadata.getMethods().values()) {

@@ -17,6 +17,7 @@ package com.facebook.swift.client.guice;
 
 import com.facebook.swift.client.SwiftClient;
 import com.facebook.swift.client.SwiftClientFactory;
+import com.facebook.swift.client.SwiftClientFactoryManager;
 import com.facebook.swift.codec.ThriftCodecManager;
 import com.facebook.swift.transport.AddressSelector;
 import com.facebook.swift.transport.ClientEventHandler;
@@ -167,15 +168,15 @@ public class SwiftClientBinder
         @Override
         protected SwiftClient<T> get(Injector injector, Class<T> clientInterface, Class<? extends Annotation> annotation)
         {
-            SwiftClientFactory<Annotation> proxyFactory = injector.getInstance(Key.get(new TypeLiteral<SwiftClientFactory<Annotation>>() {}));
-
+            SwiftClientFactoryManager<Annotation> swiftClientFactoryManager = injector.getInstance(Key.get(new TypeLiteral<SwiftClientFactoryManager<Annotation>>() {}));
             Annotation clientAnnotation = getSwiftClientAnnotation(clientInterface, annotation);
 
             AddressSelector addressSelector = injector.getInstance(Key.get(AddressSelector.class, clientAnnotation));
             List<ClientEventHandler<?>> eventHandlers = ImmutableList.copyOf(injector.getInstance(
                     Key.get(new TypeLiteral<Set<ClientEventHandler<?>>>() {}, clientAnnotation)));
 
-            return proxyFactory.createSwiftClient(clientInterface, clientAnnotation, eventHandlers, addressSelector);
+            SwiftClientFactory swiftClientFactory = swiftClientFactoryManager.createSwiftClientFactory(clientAnnotation, addressSelector);
+            return swiftClientFactory.createSwiftClient(clientInterface, eventHandlers);
         }
     }
 
@@ -187,9 +188,9 @@ public class SwiftClientBinder
 
         @Provides
         @Singleton
-        private SwiftClientFactory<Annotation> getSwiftClientFactory(ThriftCodecManager codecManager, MethodInvokerFactory<Annotation> methodInvokerFactory)
+        private SwiftClientFactoryManager<Annotation> getSwiftClientFactory(ThriftCodecManager codecManager, MethodInvokerFactory<Annotation> methodInvokerFactory)
         {
-            return new SwiftClientFactory<>(codecManager, methodInvokerFactory);
+            return new SwiftClientFactoryManager<>(codecManager, methodInvokerFactory);
         }
 
         @Override
